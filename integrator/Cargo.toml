@@ -1,0 +1,20 @@
+[package]
+name = "integrator"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+rand = "0.9.2"
+cudarc = { version = "0.17.3", features = ["cuda-version-from-build-system"] }
+rayon = "1.11.0"
+
+[[bin]]
+name = "main"
+path = "src/main.rs"
+
+[[bin]]
+name = "bench"
+path = "src/bench.rs"
+
+[lints.rust]
+unused = "allow"
