@@ -1,6 +1,5 @@
 pub mod euclidean;
-pub mod euclideansheet;
 pub mod ias;
 pub mod iasv1;
 pub mod iasv2;
-pub mod iassheet;
+pub mod iaswedge;

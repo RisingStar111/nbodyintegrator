@@ -327,7 +327,8 @@ impl ParticleIAS {
         vector.into_iter().flat_map(|v| *v.as_array()).collect::<Vec<f64>>()
     }
 
-    fn set_acceleration_compensated_simd(&mut self) { //(only 0% faster with how bad it is)
+    /// Best results when compiled targeting native cpu
+    fn set_acceleration_compensated_simd(&mut self) { //(only 0% faster with how bad it is) // actually was faster on larger stuff without avx2? // also 2x faster if i actually build with avx2 whoops
         // move particle data into vecs and splat into f64x4s for batch
         // actually a very odd thing to do, and doesn't need padding depending on how you run it, at best results in 2x (or 4 if able to swap to x8s) speedup (since double work as not trianguling)
         let mut x_vec = vec![];
@@ -349,20 +350,20 @@ impl ParticleIAS {
         let x = ParticleIAS::vec_to_x4(x_vec);
         let y = ParticleIAS::vec_to_x4(y_vec);
         let z = ParticleIAS::vec_to_x4(z_vec);
-        let zero_vec = vec![0.; self.system.particles.len()];
-        let mut ax = ParticleIAS::vec_to_x4(zero_vec);
+        let four_len = x.len();
+        let mut ax = vec![f64x4::from_array([0., 0., 0., 0.]); four_len];
         let mut ay = ax.clone();
         let mut az = ax.clone();
         let mut eax = ax.clone();
         let mut eay = ax.clone();
         let mut eaz = ax.clone();
         let g = f64x4::splat(self.system.constants.G);
-        let four_len = x.len();
 
         // do acceleration dings
         // padding results in / 0 and thus NaNs but this shouldn't ever make it back to the system
         if self.rayon_threads == 1 {
             for four_index in 0..four_len {
+                // let now = Instant::now();
                 let mut ix = x[four_index];
                 let mut iy = y[four_index];
                 let mut iz = z[four_index];
@@ -372,6 +373,7 @@ impl ParticleIAS {
                 let mut eaxtmp = f64x4::splat(0.);
                 let mut eaytmp = f64x4::splat(0.);
                 let mut eaztmp = f64x4::splat(0.);
+                // self.counters.timer += now.elapsed();
                 for j in 0..splat_m.len() {
                     let dx = splat_x[j] - ix;
                     let dy = splat_y[j] - iy;
@@ -379,9 +381,9 @@ impl ParticleIAS {
                     let sq = dx*dx + dy*dy + dz*dz;
                     let sqr = sq.sqrt(); // iirc this doesn't really get sped up by simd
                     let a_mag = g / (sq * sqr) * splat_m[j];
-                    // set change to 0 if nan (eg from accelerating self) // likely abysmal atm
+                    // set change to 0 if nan (eg from accelerating self) // this actually compiles nicely
                     let a_mag = f64x4::from_array(a_mag.as_array().map(|v| if v.is_finite() {v} else {0.}));
-
+                    
                     // compensated sums
                     let valax = dx * a_mag - eaxtmp;
                     let valay = dy * a_mag - eaytmp;
@@ -472,7 +474,7 @@ impl ParticleIAS {
     }
 
     fn update_acceleration(&mut self) {
-        let now = Instant::now();
+        // let now = Instant::now();
         match self.acceleration_calculation {
             AccelerationCalculationMode::Serial => {
                 self.error_a = self.system.set_acceleration_compensated().iter().flat_map(|f| f.array()).collect();
@@ -484,7 +486,7 @@ impl ParticleIAS {
                 self.set_acceleration_compensated_gpu();
             }
         }
-        self.counters.timer += now.elapsed();
+        // self.counters.timer += now.elapsed();
     }
 
     fn predict_next_step(&mut self, timestep_ratio: f64) {

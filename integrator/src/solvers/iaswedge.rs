@@ -35,7 +35,7 @@ impl Subspacedarray {
 }
 
 pub struct ParticleIAS {
-    pub system: systems::Sheet,
+    pub system: systems::Wedge,
     // other settings/etc
     pub time: f64,
     pub delta_t: f64,
@@ -59,7 +59,7 @@ pub struct ParticleIAS {
 impl ParticleIAS {
     pub fn default() -> Self {
         ParticleIAS { 
-            system: systems::Sheet::default(),
+            system: systems::Wedge::default(),
             time: 0.,
             delta_t: 0.01,
             last_delta_t: 0.,
@@ -126,12 +126,12 @@ impl ParticleIAS {
     
     fn try_step(&mut self) -> Option<()> { // breaks when particles have mass, in strange ways, somewhat aleviated by having a min_timestep
         // go to heleocentric (ignoring error atm) // would only be able to do this once externally in rebound, less stable here than in try_step
-        // self.system.to_com();
-        for i in (0..self.system.base.num_particles()).rev() { // why does this break it // cuz it doesn't break the normal once
-            self.system.base.particles[i].position = self.system.base.particles[i].position - self.system.base.particles[0].position;
-            self.system.base.particles[i].velocity = self.system.base.particles[i].velocity - self.system.base.particles[0].velocity;
-            self.system.base.particles[i].acceleration = self.system.base.particles[i].acceleration - self.system.base.particles[0].acceleration;
-        }
+        // self.system.to_com(); // giga drift
+        // for i in (0..self.system.base.num_particles()).rev() { // why does this break it // cuz it doesn't break the normal once // sometimes works, but randomly dies, more particles = stabler? // high initial error in those cases
+        //     self.system.base.particles[i].position = self.system.base.particles[i].position - self.system.base.particles[0].position;
+        //     self.system.base.particles[i].velocity = self.system.base.particles[i].velocity - self.system.base.particles[0].velocity;
+        //     self.system.base.particles[i].acceleration = self.system.base.particles[i].acceleration - self.system.base.particles[0].acceleration;
+        // } // this seems to not work because the star ends up at exactly 0. // tho with the wedgeing now accounting for central translation, this isnt needed in the first place
         self.system.lock_to_wedge();
 
         self.update_acceleration(); // extra forces happen after main accel in rebound
@@ -200,6 +200,7 @@ impl ParticleIAS {
                     }
                 }
                 // calculate (static) force (at new pos/vel) (each 3 component particle at once ofc)
+                // self.system.lock_to_wedge();
                 self.update_acceleration(); // sets self.error_a
                 // calculate corrected 'g' coefficient
                 let ac = self.system.base.particles.iter().flat_map(|p| p.acceleration.array()).collect::<Vec<f64>>();

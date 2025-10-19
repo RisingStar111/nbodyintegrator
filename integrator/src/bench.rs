@@ -133,25 +133,25 @@ fn main() {
     println!("{:?}", sim.system.energy());
     println!("{:?}", e0);
 
-    let mut sim = solvers::ias::ParticleIAS::default();
-    sim.system.add_particle(Particle::new(1., [0., 0., 0.], [0., 0., 0.]));
-    sim.system.add_particle(Particle::new(0.01, [1., 0., 0.], [0., 1., 0.]));
-    sim.system.add_particle(Particle::new(1., [2., 0., 0.], [0., 0.2, 0.2]));
-    for i in 0..pos.len() {
-        sim.system.add_particle(Particle::new(0.01, pos[i], vel[i]));
-    }
-    sim.system.to_com();
-    let e0 = sim.system.energy();
+    // let mut sim = solvers::ias::ParticleIAS::default();
+    // sim.system.add_particle(Particle::new(1., [0., 0., 0.], [0., 0., 0.]));
+    // sim.system.add_particle(Particle::new(0.01, [1., 0., 0.], [0., 1., 0.]));
+    // sim.system.add_particle(Particle::new(1., [2., 0., 0.], [0., 0.2, 0.2]));
+    // for i in 0..pos.len() {
+    //     sim.system.add_particle(Particle::new(0.01, pos[i], vel[i]));
+    // }
+    // sim.system.to_com();
+    // let e0 = sim.system.energy();
 
-    let start = Instant::now();
-    sim.stepn(steps);
-    println!("{:?}", start.elapsed());
-    println!("{:?}", sim.counters);
-    println!("{:?}", sim.system.particles[0]);
-    println!("{:?}", sim.time);
-    println!("{:?}", sim.delta_t); // dt is 1/3rd of rebounds... // dt starts capped min that's not good
-    println!("{:?}", sim.system.energy());
-    println!("{:?}", e0);
+    // let start = Instant::now();
+    // sim.stepn(steps);
+    // println!("{:?}", start.elapsed());
+    // println!("{:?}", sim.counters);
+    // println!("{:?}", sim.system.particles[0]);
+    // println!("{:?}", sim.time);
+    // println!("{:?}", sim.delta_t); // dt is 1/3rd of rebounds... // dt starts capped min that's not good
+    // println!("{:?}", sim.system.energy());
+    // println!("{:?}", e0);
     // v1 to v2 causes a difference, tho still not matching with rebound
 }
 

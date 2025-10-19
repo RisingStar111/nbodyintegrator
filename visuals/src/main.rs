@@ -41,7 +41,7 @@ impl Renderable for systems::ParticleSystem {
         }
     }
 }
-impl Renderable for systems::Sheet {
+impl Renderable for systems::Wedge {
     fn render(&self, camera: &camera::OrthographicOrbitalCamera, window: &window_utils::SubWindow, buffer: &mut Buffer<Rc<Window>, Rc<Window>>, window_width: usize, colour: u32) {
         self.base.render(camera, window, buffer, window_width, colour);
         for particle in &self.base.particles {
@@ -94,11 +94,11 @@ fn main() {
     let mut simulation_window = window_utils::SubWindow::new(0, 0, 100, 100);
     let mut simulation_window2 = window_utils::SubWindow::new(0, 0, 100, 100);
 
-    let solver = Arc::new(Mutex::new(solvers::ias::ParticleIAS::default()));
-    // let solver = Arc::new(Mutex::new(solvers::iassheet::ParticleIAS::default()));
+    // let solver = Arc::new(Mutex::new(solvers::ias::ParticleIAS::default()));
+    let solver = Arc::new(Mutex::new(solvers::iaswedge::ParticleIAS::default()));
     // let solver = Arc::new(Mutex::new(solvers::euclideansheet::ParticleEuclidean::default()));
     let mut lock = solver.lock().unwrap();
-    // lock.system.set_wedge_num(2.0, 1);
+    lock.system.set_wedge_num(0.5, 1);
     // lock.system.add_particle(integrator::particle::Particle::new(1., [1.,1.,4.], [0.,0.,0.]));
     // lock.system.add_particle(integrator::particle::Particle::new(2., [2.,2.,4.], [0.,0.,0.]));
     // lock.system.add_particle(integrator::particle::Particle::new(3., [3.,3.,4.], [0.,0.,0.]));
@@ -109,17 +109,18 @@ fn main() {
     // lock.system.add_particle(integrator::particle::Particle::new(0.0, [maths::rotate_xy_accurate(1., 0., -2.*PI/3.).0, maths::rotate_xy_accurate(1., 0., -2.*PI/3.).1, 0.], [maths::rotate_xy_accurate(0., 1., -2.*PI/3.).0, maths::rotate_xy_accurate(0., 1., -2.*PI/3.).1, 0.]));
     // lock.system.add_particle(integrator::particle::Particle::new(0.01, [2.,0.,0.], [0.,1.,0.]));
     // lock.system.add_particle(integrator::particle::Particle::new(0.01, [1.5,0.,0.], [0.,1.,0.]));
-    let p = lock.system.particles[0].clone();
-    let g = lock.system.constants.G;
+    let p = lock.system.base.particles[0].clone();
+    let g = lock.system.base.constants.G;
     // lock.system.add_particle(integrator::particle::Particle::new_from_orbit(0.1, &p, g, 1., 0., 0., 0., 0.));
     for i in 1..100 {
-        lock.system.add_particle(integrator::particle::Particle::new_from_orbit(0., &p, g, rand::random_range(0.8e3..1.2e3), rand::random_range(0.0..0.01), rand::random_range(0.0..0.01), rand::random_range(0.0..(2.*PI)), rand::random_range(0.0..(2.*PI))));
+        lock.system.add_particle(integrator::particle::Particle::new_from_orbit(1e-6, &p, g, rand::random_range(0.8e3..1.2e3), rand::random_range(0.0..0.01), rand::random_range(0.0..0.01), rand::random_range(0.0..(2.*PI)), rand::random_range(0.0..(2.*PI))));
     }
-    lock.system.add_particle(integrator::particle::Particle::new_from_orbit(0.1, &p, g, rand::random_range(0.8e3..1.2e3), rand::random_range(0.0..0.01), rand::random_range(0.0..0.01), rand::random_range(0.0..(2.*PI)), rand::random_range(0.0..(2.*PI))));
+    // lock.system.add_particle(integrator::particle::Particle::new_from_orbit(0.1, &p, g, rand::random_range(0.8e3..1.2e3), rand::random_range(0.0..0.01), rand::random_range(0.0..0.01), rand::random_range(0.0..(2.*PI)), rand::random_range(0.0..(2.*PI))));
     lock.system.set_acceleration_compensated();
-    lock.system.to_com();
-    lock.acceleration_calculation = solvers::ias::AccelerationCalculationMode::Simd;
-    lock.rayon_threads = 4;
+    // lock.system.to_com();
+    lock.system.stabilise_wedge();
+    // lock.acceleration_calculation = solvers::ias::AccelerationCalculationMode::Simd;
+    // lock.rayon_threads = 4;
     let e0 = lock.system.energy();
     println!("{:?}", e0);
     // lock.stepn(4);

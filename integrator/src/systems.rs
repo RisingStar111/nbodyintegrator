@@ -2,11 +2,15 @@ use std::f64::consts::PI;
 
 use crate::{maths::{rotate_xy_accurate, V3}, particle::Particle, traits::System};
 
+/// SI values for various physical constants
 pub trait Constants { // in SI
+    /// Astronomical unit. Distance from Earth to the Sun.
     const AU: f64 = 1.495978707e11;
+    /// Gravitational constant.
     const G: f64 = 6.6743e-11;
 }
 
+/// Stores base values for dimensions, and constants using those units.
 #[derive(Debug)]
 pub struct SystemConstants {
     pub G: f64,
@@ -24,6 +28,7 @@ impl SystemConstants {
     }
 }
 
+/// Basic system using an array of particles, as opposed to ArraySystem, which uses arrays of particle properties.
 #[derive(Debug)]
 pub struct ParticleSystem {
     pub particles: Vec<Particle>,
@@ -52,9 +57,6 @@ impl System for ParticleSystem {
     fn set_particle(&mut self, index: usize, new: Particle) {
         self.particles[index] = new;
     }
-    // fn total_mass(&self) -> f64 {
-    //     self.particles.iter().fold(0., |acc, e| acc + e.mass)
-    // }
     fn total_mass(&self) -> f64 { // compensated (is different as expected)
         crate::maths::compensated_sum(self.particles.iter().map(|p| &p.mass).into_iter())
     }
@@ -71,6 +73,9 @@ impl System for ParticleSystem {
     //         particle.velocity = particle.velocity - cov;
     //     }
     // }
+    /// Move the System to its center-of-mass frame.
+    /// 
+    /// This system uses compensated summation, diverging from REBOUND.
     fn to_com(&mut self) { // compensated (more stable again who could have guessed) // ~~rebound appears to take the worst possible approach in terms of error~~
         let total_mass = self.total_mass();
         let com = self.particles.iter().fold((V3::zero(), V3::zero()), |(acc, err), e| 
@@ -103,27 +108,6 @@ impl System for ParticleSystem {
         }
     }
     fn set_acceleration_compensated(&mut self) -> Vec<crate::maths::V3> {
-        // let mut error = vec![V3::zero(); self.num_particles()]; // pre-optimisation pass
-        // for i in 0..self.num_particles() {
-        //     self.particles[i].acceleration = V3::zero();
-        // }
-        // for i in 0..self.num_particles()-1 { // more precise than directly adjusting the vel anyway, tho slower
-        //     for j in i+1..self.num_particles() {
-        //         let delta = self.particles[j].position - self.particles[i].position; // a-b == -(b-a) which is good to know, so no extra error from that ~~(or the test compiled it out)~~ - the full expression also seems consistent regardless of where the - is, tho spooky (not that it would cause 'more' error, just 'different' error, if anything)
-        //         let sq_mag = delta.sq_mag();
-        //         let a_mag = self.constants.G / (sq_mag * sq_mag.sqrt());
-        //         let id = delta * (a_mag * self.particles[j].mass) - error[i];
-        //         let jd = delta * (a_mag * -self.particles[i].mass) - error[j];
-        //         let it = self.particles[i].acceleration + id;
-        //         let jt = self.particles[j].acceleration + jd;
-        //         error[i] = (it - self.particles[i].acceleration) - id;
-        //         error[j] = (jt - self.particles[j].acceleration) - jd;
-        //         self.particles[i].acceleration = it;
-        //         self.particles[j].acceleration = jt;
-        //     }
-        // }
-        // error
-        // no changes seem to have helped (or hurt) in this
         let num_particles = self.num_particles();
         let mut error = vec![V3::zero(); num_particles]; // inb4 v3 isn't getting 0 cost abstracted
         for i in 0..num_particles {
@@ -175,6 +159,9 @@ impl System for ParticleSystem {
     // todo orbital parameter initialisations
 }
 
+/// Basic system using arrays of particle properties, as opposed to ParticleSystem, which uses an array of particles.
+/// 
+/// Not very supported, due to the loss in ergonomics and lack of benefit for most computations.
 #[derive(Debug)]
 pub struct ArraySystem { // semi-tested but unused as conversions aren't costly (and borrow checker gets in they way of nice access from this end)
     pub masses: Vec<f64>,
@@ -248,17 +235,19 @@ impl System for ArraySystem {
     }
 }
 
+/// System that directly reduces the domain to a wedge/segment centered around the primary (0th) particle.
+///
 /// Rotation (and thus assumed system orientation) is around the Z axis
 #[derive(Debug)]
-pub struct Sheet {
+pub struct Wedge {
     pub base: ParticleSystem,
     pub angle: f64,
     pub ghost_wedges: usize, // how many either side, so 2x ghosts sections simulated
 }
 
-impl Sheet {
+impl Wedge {
     pub fn default() -> Self {
-        Sheet { base: ParticleSystem::default(), angle: 2.*PI/3., ghost_wedges: 1}
+        Wedge { base: ParticleSystem::default(), angle: 2.*PI/3., ghost_wedges: 1}
     }
 
     pub fn set_wedge_num(&mut self, angle: f64, ghost: usize) {
@@ -274,7 +263,9 @@ impl Sheet {
     }
 
     pub fn lock_to_wedge(&mut self) {
+        let zeropos = self.base.particles[0].position;
         for p in &mut self.base.particles {
+            p.position = p.position - zeropos;
             let (newx, newy) = rotate_xy_accurate(p.position.x, p.position.y, -self.angle);
             if newy >= 0. {
                 p.position = [newx, newy, p.position.z].into();
@@ -287,11 +278,18 @@ impl Sheet {
                 let (newvx, newvy) = rotate_xy_accurate(p.velocity.x, p.velocity.y, self.angle);
                 p.velocity = [newvx, newvy, p.velocity.z].into();
             }
+            p.position = p.position + zeropos;
+        }
+    }
+
+    pub fn stabilise_wedge(&mut self) {
+        for _ in 0..((2.*PI/self.angle).ceil() as usize) {
+            self.lock_to_wedge();
         }
     }
 }
 
-impl System for Sheet {
+impl System for Wedge {
     fn add_particle(&mut self, particle: Particle) {
         self.base.add_particle(particle);
     }
@@ -315,6 +313,13 @@ impl System for Sheet {
     }
     fn set_acceleration(&mut self) {
         unimplemented!()
+        // rebound for their sheet does an interesting trick of having the force felt by ghost x from real y == force felt by real y from ghost x on the opposite box, and particularly, doing n^2/2 iterations, now to also avoid doublecounting (for compensated, this compounds error due to rotation so prolly don't use there)
+        // not used in rebound however, for the rectangular boxes, (for non-error strict integration) can work out r_g^2 to a ghost particle with r_r^2+(ghost box offset vector)dot(ghost box offset vector + 2*real particle pos vector)
+        // which is 3 * (addmul + mul) + add as well as not regoing over position memory (but do have to reget box offsets?)
+        // gpt suggests r^2 + 2*p.g + g.g instead as 2g and g.g can be stored in a lookup
+        // in place of 3*(add+sub)+2*addmul+mul ? // chatgpt aided analysis suggests this would be equal/slower ignoring mem costs, because you still need the delta to ghost
+        // can reduce the add+sub in above by looping over ghosts on the inner since you already have r2-r1
+        // could take out G (tho for compensated, messes with the second order error) // would this even be better since G is the target of a divide?
     }
     fn set_acceleration_compensated(&mut self) -> Vec<crate::maths::V3> {
         let mut error = vec![V3::zero(); self.num_particles()];
@@ -329,9 +334,12 @@ impl System for Sheet {
 
             for k in 1..self.ghost_wedges+1 { // errors in rotation leads to (slight) inhomogeneity hmm (aka should this also be compensated)
                 // anticlockwise
+                let oldpos = self.base.particles[i].position;
+                self.base.particles[i].position = self.base.particles[i].position - self.base.particles[0].position;
                 particles.push(self.base.particles[i].position.rotated_accurate(k as f64 * self.angle));
                 // clockwise
                 particles.push(self.base.particles[i].position.rotated_accurate(-(k as f64) * self.angle));
+                self.base.particles[i].position = oldpos;
             }
         }
         for i in 0..self.base.num_particles() { // iter all particles to get self ghosts gravity (inner loop is empty on last one)

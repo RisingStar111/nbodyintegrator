@@ -16,6 +16,7 @@ enum ArchivingTimestep {
     Linear,
     Logarithmic
 }
+/// Handling for archiving.
 pub struct Manager {
     // logging: bool,
     // archiving: ArchivingTimestep,
@@ -69,6 +70,8 @@ impl Manager {
         archive_num
     }
 }
+
+// varpro crate for fitting probably
 
 fn main() {
     let mut two_body_sim = ParticleEuclidean::default();

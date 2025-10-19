@@ -9,17 +9,23 @@ pub struct Particle {
 }
 
 impl Particle {
+    /// Creates a particle with all parameters set to 0.
     pub fn default() -> Particle {
         Particle { mass: 0., position: [0.; 3].into(), velocity: [0.; 3].into(), acceleration: [0.; 3].into() }
     }
+    /// Creates a particle with a given mass, position and velocity.
     pub fn new<T>(mass: f64, position: T, velocity: T) -> Particle 
     where T: Into<V3> {
         Particle { mass, position: position.into(), velocity: velocity.into(), acceleration: [0.; 3].into() }
     }
+    /// Creates a particle with a given mass, position, velocity and acceleration.
     pub fn new_with_acceleration<T>(mass: f64, position: T, velocity: T, acceleration: T) -> Particle 
         where T: Into<V3> {
         Particle { mass, position: position.into(), velocity: velocity.into(), acceleration: acceleration.into() }
     }
+    /// Creates a particle from orbital parameters. The 'primary' is the target of the new particle's orbit.
+    /// 
+    /// TODO: limits on and explanations of orbital parameters
     #[allow(non_snake_case)]
     pub fn new_from_orbit(mass: f64, primary: &Particle, G: f64, semi_major: f64, eccentricity: f64, inclination: f64, true_anomaly: f64, pericenter_argument: f64) -> Particle {
 
@@ -61,11 +67,8 @@ impl Particle {
         return p;
     }
 
-    pub fn position_delta(&self, p2: &Self) -> V3 {
+    /// Vector to another particle.
+    pub fn position_delta(&self, p2: &Particle) -> V3 {
         p2.position - self.position
-    }
-
-    pub fn to_le_bytes(&self) -> Vec<u8> {
-        [self.mass.to_le_bytes().to_vec(), self.position.to_le_bytes(), self.velocity.to_le_bytes()].concat()
     }
 }

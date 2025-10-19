@@ -3,7 +3,7 @@ use std::io::{Read, Write};
 use crate::{particle::Particle, systems::{ParticleSystem, SystemConstants}, traits::System};
 
 // Any change to this file should increment the version number
-const ARCHIVE_VERSION: u64 = 0;
+const ARCHIVE_VERSION: u64 = 1;
 
 pub enum Archivable {
     ParticleSystem
@@ -73,6 +73,9 @@ impl SystemConstants {
     }
 }
 impl Particle {
+    fn to_le_bytes(&self) -> Vec<u8> {
+        [self.mass.to_le_bytes().to_vec(), self.position.to_le_bytes(), self.velocity.to_le_bytes()].concat()
+    }
     fn read_bytes(reader: &mut std::io::BufReader<std::fs::File>) -> Vec<u8> {
         let mut out = [0; 7*8];
         reader.read_exact(&mut out);
